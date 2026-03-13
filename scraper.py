@@ -7,73 +7,49 @@ headers = {
     "User-Agent": "Mozilla/5.0"
 }
 
-# tecnologias que aumentam score
-TECH_SCORE = {
-    "php": 3,
-    "laravel": 3,
-    "node": 3,
-    "node.js": 3,
-    "javascript": 2,
-    "typescript": 2,
-    "angular": 2,
-    "python": 2,
-    "mysql": 1,
-    "postgresql": 1,
-}
 
-# empresas ignoradas
-EXCLUDE_COMPANIES = [
-    "bairesdev",
-    "turing",
-    "toptal",
-    "crossover"
-]
+def get_job_description(job_id):
 
+    url = f"https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{job_id}"
 
-# ============================
-# CALCULAR SCORE
-# ============================
+    try:
 
-def calculate_score(text, include_skills):
+        r = requests.get(url, headers=headers, timeout=10)
 
-    text = text.lower()
-    score = 0
+        soup = BeautifulSoup(r.text, "html.parser")
 
-    for tech, value in TECH_SCORE.items():
-        if tech in text:
-            score += value
+        desc = soup.find("div", class_="show-more-less-html__markup")
 
-    for skill in include_skills:
-        if skill.lower() in text:
-            score += 2
+        if desc:
+            return desc.get_text(" ").strip()
 
-    return score
+    except:
+        pass
 
+    return ""
 
-# ============================
-# BUSCAR VAGAS
-# ============================
 
 def search_jobs(
-    query="",
-    include_skills=None,
-    exclude_skills=None,
-    location="Brazil",
-    period="24h",
-    remote="remote"
+    query,
+    include_skills,
+    exclude_skills,
+    exclude_companies,
+    location,
+    period,
+    remote
 ):
 
-    if include_skills is None:
-        include_skills = []
+    if not location:
+        location = "Brazil"
 
-    if exclude_skills is None:
-        exclude_skills = []
+    if not period:
+        period = "24h"
 
     base_url = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
 
     jobs = {}
 
-    pages = 3
+    pages = 2
 
     for page in range(pages):
 
@@ -83,21 +59,27 @@ def search_jobs(
             "start": page * 25
         }
 
-        # filtro tempo
         if period == "24h":
             params["f_TPR"] = "r86400"
+
         elif period == "7d":
             params["f_TPR"] = "r604800"
 
-        # filtro remoto
         if remote == "remote":
             params["f_WT"] = "2"
+
         elif remote == "hybrid":
             params["f_WT"] = "3"
+
         elif remote == "onsite":
             params["f_WT"] = "1"
 
-        r = requests.get(base_url, params=params, headers=headers)
+        try:
+
+            r = requests.get(base_url, params=params, headers=headers, timeout=10)
+
+        except:
+            continue
 
         soup = BeautifulSoup(r.text, "html.parser")
 
@@ -113,21 +95,19 @@ def search_jobs(
                 continue
 
             title = title_tag.text.strip()
-            title_lower = title.lower()
 
             link = link_tag["href"]
 
             company = ""
+
             if company_tag:
                 company = company_tag.text.strip()
 
             company_lower = company.lower()
 
-            # filtrar empresas
-            if any(c in company_lower for c in EXCLUDE_COMPANIES):
+            if any(c.lower() in company_lower for c in exclude_companies):
                 continue
 
-            # id da vaga
             job_id_match = re.search(r"\d+", link)
 
             if not job_id_match:
@@ -135,20 +115,36 @@ def search_jobs(
 
             job_id = job_id_match.group()
 
-            # excluir tecnologias
-            if any(skill.lower() in title_lower for skill in exclude_skills):
+            desc = get_job_description(job_id)
+
+            text = f"{title} {desc}".lower()
+
+            if any(skill.lower() in text for skill in exclude_skills):
                 continue
 
-            score = calculate_score(title, include_skills)
+            matched_skills = []
+
+            for skill in include_skills:
+
+                if skill.lower() in text:
+                    matched_skills.append(skill)
+
+            match_count = len(matched_skills)
 
             jobs[job_id] = {
                 "id": job_id,
                 "title": title,
                 "company": company,
                 "link": link,
-                "score": score
+                "description": desc,
+                "matched_skills": matched_skills,
+                "match_count": match_count
             }
 
         time.sleep(0.3)
 
-    return list(jobs.values())
+    jobs_list = list(jobs.values())
+
+    jobs_list.sort(key=lambda x: x["match_count"], reverse=True)
+
+    return jobs_list
