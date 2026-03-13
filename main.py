@@ -4,13 +4,15 @@ from scraper import search_jobs
 from collections import Counter
 
 app = FastAPI()
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # permite qualquer frontend
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 @app.get("/search")
 def search(
@@ -20,7 +22,8 @@ def search(
     exclude_companies: str = "",
     location: str = "",
     period: str = "24h",
-    remote: str = ""
+    remote: str = "",
+    english: str = "include"
 ):
 
     include_skills = [s.strip() for s in include.split(",") if s.strip()]
@@ -34,7 +37,8 @@ def search(
         exclude_companies=exclude_companies,
         location=location,
         period=period,
-        remote=remote
+        remote=remote,
+        english=english
     )
 
     # =========================
@@ -56,7 +60,11 @@ def search(
             "count": count
         })
 
-    summary = f"Foram analisadas {len(jobs)} vagas. As habilidades mais presentes entre as vagas analisadas foram: " + ", ".join([s["name"] for s in top_skills[:5]])
+    summary = (
+        f"Foram analisadas {len(jobs)} vagas. "
+        "As habilidades mais presentes entre as vagas analisadas foram: "
+        + ", ".join([s["name"] for s in top_skills[:5]])
+    )
 
     return {
         "total_jobs": len(jobs),

@@ -8,6 +8,42 @@ headers = {
 }
 
 
+def load_english_words():
+
+    words = []
+
+    try:
+
+        with open("english_words.txt", "r", encoding="utf-8") as f:
+
+            for line in f:
+
+                word = line.strip().lower()
+
+                if word:
+                    words.append(word)
+
+    except:
+        pass
+
+    return words
+
+
+ENGLISH_WORDS = load_english_words()
+
+
+def detect_english(text):
+
+    count = 0
+
+    for word in ENGLISH_WORDS:
+
+        if word in text:
+            count += 1
+
+    return count
+
+
 def get_job_description(job_id):
 
     url = f"https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{job_id}"
@@ -36,7 +72,8 @@ def search_jobs(
     exclude_companies,
     location,
     period,
-    remote
+    remote,
+    english
 ):
 
     if not location:
@@ -119,6 +156,14 @@ def search_jobs(
 
             text = f"{title} {desc}".lower()
 
+            english_score = detect_english(text)
+
+            if english == "only" and english_score < 2:
+                continue
+
+            if english == "exclude" and english_score >= 2:
+                continue
+
             if any(skill.lower() in text for skill in exclude_skills):
                 continue
 
@@ -129,8 +174,6 @@ def search_jobs(
                 if skill.lower() in text:
                     matched_skills.append(skill)
 
-            match_count = len(matched_skills)
-
             jobs[job_id] = {
                 "id": job_id,
                 "title": title,
@@ -138,7 +181,8 @@ def search_jobs(
                 "link": link,
                 "description": desc,
                 "matched_skills": matched_skills,
-                "match_count": match_count
+                "match_count": len(matched_skills),
+                "is_english": english_score >= 2
             }
 
         time.sleep(0.3)
