@@ -1,7 +1,11 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from scraper import search_jobs
+from sqlalchemy.orm import Session
 from collections import Counter
+
+from database import get_db, init_db
+from services.scraper import search_jobs
+from services.save_jobs import save_jobs
 
 app = FastAPI()
 
@@ -13,6 +17,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.on_event("startup")
+def startup():
+    init_db()
 
 @app.get("/search")
 def search(
@@ -23,7 +30,8 @@ def search(
     location: str = "",
     period: str = "24h",
     remote: str = "",
-    english: str = "include"
+    english: str = "include",
+    db: Session = Depends(get_db)
 ):
 
     include_skills = [s.strip() for s in include.split(",") if s.strip()]
@@ -41,24 +49,22 @@ def search(
         english=english
     )
 
-    # =========================
-    # MARKET ANALYSIS
-    # =========================
+    try:
+        saved_count = save_jobs(db, jobs)
+    except Exception as e:
+        print("Erro ao salvar jobs:", e)
+        saved_count = 0
 
     skills_counter = Counter()
 
     for job in jobs:
-
         for skill in job["matched_skills"]:
             skills_counter[skill] += 1
 
-    top_skills = []
-
-    for skill, count in skills_counter.most_common(10):
-        top_skills.append({
-            "name": skill,
-            "count": count
-        })
+    top_skills = [
+        {"name": skill, "count": count}
+        for skill, count in skills_counter.most_common(10)
+    ]
 
     summary = (
         f"Foram analisadas {len(jobs)} vagas. "
@@ -68,6 +74,7 @@ def search(
 
     return {
         "total_jobs": len(jobs),
+        "saved_jobs": saved_count,
         "jobs": jobs,
         "skills": top_skills,
         "summary": summary

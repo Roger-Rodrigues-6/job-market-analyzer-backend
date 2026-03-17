@@ -7,22 +7,15 @@ headers = {
     "User-Agent": "Mozilla/5.0"
 }
 
-
 def load_english_words():
-
     words = []
 
     try:
-
         with open("english_words.txt", "r", encoding="utf-8") as f:
-
             for line in f:
-
                 word = line.strip().lower()
-
                 if word:
                     words.append(word)
-
     except:
         pass
 
@@ -31,26 +24,24 @@ def load_english_words():
 
 ENGLISH_WORDS = load_english_words()
 
-
 def detect_english(text):
-
     count = 0
 
     for word in ENGLISH_WORDS:
-
         if word in text:
             count += 1
 
     return count
-
 
 def get_job_description(job_id):
 
     url = f"https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{job_id}"
 
     try:
-
         r = requests.get(url, headers=headers, timeout=10)
+
+        if r.status_code != 200:
+            return ""
 
         soup = BeautifulSoup(r.text, "html.parser")
 
@@ -63,7 +54,6 @@ def get_job_description(job_id):
         pass
 
     return ""
-
 
 def search_jobs(
     query,
@@ -86,7 +76,7 @@ def search_jobs(
 
     jobs = {}
 
-    pages = 2
+    pages = 2 
 
     for page in range(pages):
 
@@ -98,28 +88,25 @@ def search_jobs(
 
         if period == "24h":
             params["f_TPR"] = "r86400"
-
         elif period == "7d":
             params["f_TPR"] = "r604800"
 
         if remote == "remote":
             params["f_WT"] = "2"
-
         elif remote == "hybrid":
             params["f_WT"] = "3"
-
         elif remote == "onsite":
             params["f_WT"] = "1"
 
         try:
-
             r = requests.get(base_url, params=params, headers=headers, timeout=10)
-
         except:
             continue
 
-        soup = BeautifulSoup(r.text, "html.parser")
+        if r.status_code != 200:
+            continue
 
+        soup = BeautifulSoup(r.text, "html.parser")
         listings = soup.find_all("li")
 
         for job in listings:
@@ -132,11 +119,12 @@ def search_jobs(
                 continue
 
             title = title_tag.text.strip()
+            link = link_tag.get("href", "")
 
-            link = link_tag["href"]
+            if not link:
+                continue
 
             company = ""
-
             if company_tag:
                 company = company_tag.text.strip()
 
@@ -151,6 +139,9 @@ def search_jobs(
                 continue
 
             job_id = job_id_match.group()
+
+            if job_id in jobs:
+                continue
 
             desc = get_job_description(job_id)
 
@@ -170,25 +161,26 @@ def search_jobs(
             matched_skills = []
 
             for skill in include_skills:
-
                 if skill.lower() in text:
                     matched_skills.append(skill)
 
             jobs[job_id] = {
-                "id": job_id,
+                "external_id": job_id,
                 "title": title,
                 "company": company,
-                "link": link,
+                "location": location,
+                "job_url": link,
                 "description": desc,
                 "matched_skills": matched_skills,
                 "match_count": len(matched_skills),
+                "is_remote": remote == "remote",
+                "posted_at": None, 
                 "is_english": english_score >= 2
             }
 
-        time.sleep(0.3)
+        time.sleep(0.3) 
 
     jobs_list = list(jobs.values())
-
     jobs_list.sort(key=lambda x: x["match_count"], reverse=True)
 
     return jobs_list
