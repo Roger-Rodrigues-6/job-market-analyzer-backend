@@ -4,7 +4,6 @@ from sqlalchemy import select
 from models.company import Company
 from models.job import Job
 from models.skill import Skill
-from models.job_skill import JobSkill
 
 
 def save_jobs(db: Session, jobs_data: list):
@@ -43,22 +42,24 @@ def save_jobs(db: Session, jobs_data: list):
     for c in new_companies:
         company_cache[c.name] = c
 
-    all_skills = set()
+    all_skills_set = set()
 
     for job in jobs_data:
-        all_skills.update(job.get("matched_skills", []))
+        all_skills_set.update(job.get("all_skills", []))
 
-    if all_skills:
+    if all_skills_set:
 
         existing_skills = db.execute(
-            select(Skill).where(Skill.name.in_(all_skills))
+            select(Skill).where(Skill.name.in_(all_skills_set))
         ).scalars().all()
 
         for s in existing_skills:
             skill_cache[s.name] = s
 
         new_skills = []
-        for name in all_skills:
+        for name in all_skills_set:
+            name = name.lower().strip()
+
             if name not in skill_cache:
                 new_skills.append(Skill(name=name))
 
@@ -80,25 +81,19 @@ def save_jobs(db: Session, jobs_data: list):
         db_job = Job(
             external_id=job["external_id"],
             title=job["title"],
-            company_id=company_obj.id if company_obj else None,
             location=job.get("location"),
             is_remote=job.get("is_remote"),
             job_url=job.get("job_url"),
-            posted_at=job.get("posted_at")
+            posted_at=job.get("posted_at"),
+            match_percentage=job.get("match_percentage", 0)
         )
 
+        if company_obj:
+            db_job.company_id = company_obj.id
+        for skill_name in job.get("all_skills", []):
+            skill_obj = skill_cache.get(skill_name.lower().strip())
+
         db.add(db_job)
-        db.flush()
-
-        for skill_name in job.get("matched_skills", []):
-            skill_obj = skill_cache.get(skill_name)
-
-            if skill_obj:
-                db.add(JobSkill(
-                    job_id=db_job.id,
-                    skill_id=skill_obj.id,
-                    match_count=1
-                ))
 
         saved_count += 1
 

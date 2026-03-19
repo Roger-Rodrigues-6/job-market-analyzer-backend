@@ -11,8 +11,15 @@ DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_HOST = os.getenv("DB_HOST")
 DB_NAME = os.getenv("DB_NAME")
+DB_PORT = os.getenv("DB_PORT", "3306")
 
-DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}"
+if not all([DB_USER, DB_PASSWORD, DB_HOST, DB_NAME]):
+    raise ValueError("❌ Variáveis de ambiente do banco não estão definidas corretamente")
+
+DATABASE_URL = (
+    f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    "?charset=utf8mb4"
+)
 
 engine = create_engine(
     DATABASE_URL,
@@ -31,12 +38,13 @@ def get_db():
     finally:
         db.close()
 
-from models.company import Company
-from models.job import Job
 from models.skill import Skill
-from models.job_skill import JobSkill
-from models.market_snapshot import MarketSnapshot, MarketSnapshotSkill
-
+from models.role import Role
+from models.market_snapshot import MarketSnapshot
+from models.market_snapshot_skill import MarketSnapshotSkill
+from models.search_skill_stat import SearchSkillStat
+from models.search_log import SearchLog
+from models.job import Job
 
 def init_db():
     Base.metadata.create_all(bind=engine)

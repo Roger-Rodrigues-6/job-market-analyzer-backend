@@ -2,16 +2,16 @@ from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from datetime import datetime
 from base import Base
 
-class MarketSnapshot(Base):
-    __tablename__ = "market_snapshots"
+class SearchLog(Base):
+    __tablename__ = "search_logs"
 
     id = Column(Integer, primary_key=True, index=True)
 
     role_id = Column(Integer, ForeignKey("roles.id"))
-    location = Column(String(255))
-    remote = Column(String(50))
-    period = Column(String(50))
 
-    total_jobs = Column(Integer)
+    filters_hash = Column(String(255), index=True)
+
+    ip = Column(String(100))
+    user_agent = Column(String(255))
 
     created_at = Column(DateTime, default=datetime.utcnow)

@@ -9,7 +9,6 @@ headers = {
 
 def load_english_words():
     words = []
-
     try:
         with open("english_words.txt", "r", encoding="utf-8") as f:
             for line in f:
@@ -18,7 +17,6 @@ def load_english_words():
                     words.append(word)
     except:
         pass
-
     return words
 
 
@@ -26,15 +24,32 @@ ENGLISH_WORDS = load_english_words()
 
 def detect_english(text):
     count = 0
-
     for word in ENGLISH_WORDS:
         if word in text:
             count += 1
-
     return count
 
-def get_job_description(job_id):
+def normalize_text(text):
+    text = text.lower()
+    text = text.replace(",", " ")
+    text = text.replace("/", " ")
+    text = text.replace("|", " ")
+    return text
 
+
+def contains_skill(text, skill):
+    return re.search(rf"\b{re.escape(skill.lower())}\b", text)
+
+
+def extract_skills(text, skills_list):
+    found = []
+    for skill in skills_list:
+        if contains_skill(text, skill):
+            found.append(skill)
+    return found
+
+
+def get_job_description(job_id):
     url = f"https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{job_id}"
 
     try:
@@ -75,8 +90,9 @@ def search_jobs(
     base_url = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
 
     jobs = {}
+    pages = 2
 
-    pages = 2 
+    ALL_KNOWN_SKILLS = list(set(include_skills + exclude_skills))
 
     for page in range(pages):
 
@@ -124,17 +140,13 @@ def search_jobs(
             if not link:
                 continue
 
-            company = ""
-            if company_tag:
-                company = company_tag.text.strip()
+            company = company_tag.text.strip() if company_tag else ""
 
             company_lower = company.lower()
-
             if any(c.lower() in company_lower for c in exclude_companies):
                 continue
 
             job_id_match = re.search(r"\d+", link)
-
             if not job_id_match:
                 continue
 
@@ -145,7 +157,7 @@ def search_jobs(
 
             desc = get_job_description(job_id)
 
-            text = f"{title} {desc}".lower()
+            text = normalize_text(f"{title} {desc}")
 
             english_score = detect_english(text)
 
@@ -155,14 +167,16 @@ def search_jobs(
             if english == "exclude" and english_score >= 2:
                 continue
 
-            if any(skill.lower() in text for skill in exclude_skills):
+            if any(contains_skill(text, skill) for skill in exclude_skills):
                 continue
 
-            matched_skills = []
+            matched_skills = extract_skills(text, include_skills)
+            all_skills = extract_skills(text, ALL_KNOWN_SKILLS)
 
-            for skill in include_skills:
-                if skill.lower() in text:
-                    matched_skills.append(skill)
+            if include_skills:
+                match_percentage = (len(matched_skills) / len(include_skills)) * 100
+            else:
+                match_percentage = 0
 
             jobs[job_id] = {
                 "external_id": job_id,
@@ -172,15 +186,20 @@ def search_jobs(
                 "job_url": link,
                 "description": desc,
                 "matched_skills": matched_skills,
+                "all_skills": all_skills,
                 "match_count": len(matched_skills),
+                "match_percentage": round(match_percentage, 1),
                 "is_remote": remote == "remote",
-                "posted_at": None, 
-                "is_english": english_score >= 2
+                "is_english": english_score >= 2,
+                "posted_at": None
             }
 
-        time.sleep(0.3) 
+        time.sleep(0.3)
 
     jobs_list = list(jobs.values())
-    jobs_list.sort(key=lambda x: x["match_count"], reverse=True)
+    jobs_list.sort(
+        key=lambda x: (x["match_percentage"], x["match_count"]),
+        reverse=True
+    )
 
     return jobs_list
