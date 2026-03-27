@@ -42,9 +42,13 @@ from models.skill import Skill
 from models.role import Role
 from models.market_snapshot import MarketSnapshot
 from models.market_snapshot_skill import MarketSnapshotSkill
-from models.search_skill_stat import SearchSkillStat
+from models.search import Search
 from models.search_log import SearchLog
+from models.search_skill_link import SearchSkillLink
+from models.search_excluded_company import SearchExcludedCompany
 from models.job import Job
+from models.job_skill import JobSkill
+from models.company import Company
 
 def init_db():
     Base.metadata.create_all(bind=engine)
