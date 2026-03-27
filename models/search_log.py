@@ -9,7 +9,13 @@ class SearchLog(Base):
 
     role_id = Column(Integer, ForeignKey("roles.id"))
 
+    search_id = Column(Integer, ForeignKey("searches.id"), nullable=True, index=True)
+
     filters_hash = Column(String(255), index=True)
+
+    location = Column(String(255), default="")
+    remote = Column(String(50), default="")
+    period = Column(String(50), default="")
 
     ip = Column(String(100))
     user_agent = Column(String(255))
