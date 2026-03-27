@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Date, ForeignKey
 from datetime import datetime
 from base import Base
 
@@ -13,5 +13,8 @@ class MarketSnapshot(Base):
     period = Column(String(50))
 
     total_jobs = Column(Integer)
+
+    # Dia civil (UTC) ao qual o snapshot se refere; usado pelo job diário D−1
+    report_date = Column(Date, nullable=True, index=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
